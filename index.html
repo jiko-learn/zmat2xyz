@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Z-Matrix → XYZ Converter & Viewer</title>
+    <link rel="stylesheet" href="./styles.css">
+    <!-- Local 3Dmol.js -->
+    <script src="./vendor/3Dmol-min.js"></script>
+    </head>
+  <body>
+    <header>
+      <h1>Z-Matrix → XYZ Converter & 3D Viewer</h1>
+      <h2>ให้ลองใช้งาน แล้วทดสอบโดยเปลี่ยนเป็น H<sub>2</sub>O<sub>2</sub>, CH<sub>4</sub>, H<sub>2</sub>O<sup>...</sup>H<sub>2</sub>O <br>
+      วันพุธจะได้เรียนได้เร็วขึ้นครับ</h2>
+    </header>
+
+    <main>
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Z-Matrix Input</h2>
+          <div class="actions">
+            <button id="loadExampleBtn" type="button">Load Example</button>
+            <button id="clearInputBtn" type="button" class="secondary">Clear</button>
+          </div>
+        </div>
+        <p class="hint">Format (indices are 1-based):<br>
+          1)  &nbsp;&nbsp;Atom1<br>
+          2)  &nbsp;&nbsp;Atom2&nbsp; i&nbsp; R1<br>
+          3)  &nbsp;&nbsp;Atom3&nbsp; j&nbsp; R2&nbsp;&nbsp;k&nbsp;&nbsp;A1<br>
+          4+) Atom?&nbsp; l&nbsp; R3&nbsp; m&nbsp; A2&nbsp; n&nbsp; D1<br><br>
+          Angles in degrees. Dihedrals in degrees. <br>
+          i j k l are the indices of the atoms in the previous lines. <br>
+        </p>
+        <textarea id="zmatInput" placeholder="Enter your Z-Matrix here..." spellcheck="false"></textarea>
+        <div class="row gap">
+          <button id="convertBtn" type="button">Convert to XYZ</button>
+        </div>
+        <div id="message" role="alert" aria-live="polite"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>XYZ Output</h2>
+          <div class="actions">
+            <button id="copyXYZBtn" type="button" class="secondary">Copy</button>
+            <button id="downloadXYZBtn" type="button" class="secondary">Download</button>
+          </div>
+        </div>
+        <textarea id="xyzOutput" placeholder="XYZ output will appear here" spellcheck="false" readonly></textarea>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>3D Viewer</h2>
+          <div class="actions">
+            <button id="view3DBtn" type="button" class="primary">View in 3D</button>
+            <button id="resetViewBtn" type="button" class="secondary">Reset View</button>
+          </div>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="centerCheckbox" checked> Center & auto-zoom on render</label>
+        </div>
+        <div class="row">
+          <label><input type="checkbox" id="showLabelsCheckbox"> Show atom symbol labels</label>
+        </div>
+        </div>
+        <div id="viewer" class="viewer" aria-label="3D molecule viewer"></div>
+      </section>
+    </main>
+
+    <footer>
+      <p>
+        Built for converting Z-Matrix to Cartesian coordinates and visualizing molecules.
+      </p>
+    </footer>
+
+    <script src="./app.js"></script>
+  </body>
+  </html>
+
+
