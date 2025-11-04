@@ -35,6 +35,7 @@
         <textarea id="zmatInput" placeholder="Enter your Z-Matrix here..." spellcheck="false"></textarea>
         <div class="row gap">
           <button id="convertBtn" type="button">Convert to XYZ</button>
+          <label><input type="checkbox" id="centerCheckbox"> Center the molecule</label>
         </div>
         <div id="message" role="alert" aria-live="polite"></div>
       </section>
@@ -57,9 +58,6 @@
             <button id="view3DBtn" type="button" class="primary">View in 3D</button>
             <button id="resetViewBtn" type="button" class="secondary">Reset View</button>
           </div>
-        </div>
-        <div class="row">
-          <label><input type="checkbox" id="centerCheckbox" checked> Center & auto-zoom on render</label>
         </div>
         <div class="row">
           <label><input type="checkbox" id="showLabelsCheckbox"> Show atom symbol labels</label>
