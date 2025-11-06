@@ -193,7 +193,8 @@ const els = {
   viewerDiv: document.getElementById('viewer'),
   resetViewBtn: document.getElementById('resetViewBtn'),
   centerCheckbox: document.getElementById('centerCheckbox'),
-  showLabelsCheckbox: document.getElementById('showLabelsCheckbox')
+  showLabelsCheckbox: document.getElementById('showLabelsCheckbox'),
+  showIndexLabelsCheckbox: document.getElementById('showIndexLabelsCheckbox')
 };
 
 let viewer = null; // 3Dmol viewer (fallback)
@@ -250,9 +251,14 @@ function renderWithJSmol(xyz) {
   let script = 'load DATA "model"\n' + data + 'END "model" {format xyz};\n' +
                'select *; spacefill 25%; wireframe 0.15; set zoomLarge false; zoomTo 0.0;';
   
-  // Add labels if checkbox is checked
-  if (els.showLabelsCheckbox.checked) {
+  // Add labels if checkboxes are checked
+  if (els.showLabelsCheckbox.checked && els.showIndexLabelsCheckbox.checked) {
+    // Show both index and symbol (index first, no space)
+    script += 'select *; label "%i%e"; set labelOffset 0 0; set labelSize 16; set labelColor black; set labelBgColor white;';
+  } else if (els.showLabelsCheckbox.checked) {
     script += 'select *; label %e; set labelOffset 0 0; set labelSize 16; set labelColor black; set labelBgColor white;';
+  } else if (els.showIndexLabelsCheckbox.checked) {
+    script += 'select *; label %i; set labelOffset 0 0; set labelSize 16; set labelColor black; set labelBgColor white;';
   } else {
     script += 'select *; label OFF;';
   }
@@ -270,8 +276,8 @@ function renderWith3DMol(xyz) {
   viewer.addModel(xyz, 'xyz');
   viewer.setStyle({}, { stick: { radius: 0.15 }, sphere: { scale: 0.28 } });
   
-  // Add labels only if checkbox is checked
-  if (els.showLabelsCheckbox.checked) {
+  // Add labels if checkboxes are checked
+  if (els.showLabelsCheckbox.checked || els.showIndexLabelsCheckbox.checked) {
     // Parse the XYZ to get atom positions and elements for labeling
     const lines = xyz.trim().split('\n');
     const numAtoms = parseInt(lines[0]);
@@ -285,8 +291,18 @@ function renderWith3DMol(xyz) {
         const y = parseFloat(atomData[2]);
         const z = parseFloat(atomData[3]);
         
-        // Add label with element symbol positioned slightly above the atom
-        viewer.addLabel(element, {
+        // Determine label text based on checkboxes
+        let labelText = '';
+        if (els.showLabelsCheckbox.checked && els.showIndexLabelsCheckbox.checked) {
+          labelText = `${i + 1}${element}`; // Show both index and symbol (index first, no space)
+        } else if (els.showLabelsCheckbox.checked) {
+          labelText = element; // Show only symbol
+        } else if (els.showIndexLabelsCheckbox.checked) {
+          labelText = String(i + 1); // Show only index
+        }
+        
+        // Add label positioned slightly above the atom
+        viewer.addLabel(labelText, {
           position: { x: x, y: y + 0.3, z: z }, // Offset y to place label above atom
           backgroundColor: 'rgba(255,255,255,0.9)',
           fontColor: 'black',
@@ -382,6 +398,18 @@ els.downloadXYZBtn.addEventListener('click', downloadXYZ);
 els.loadExampleBtn.addEventListener('click', loadExample);
 els.clearInputBtn.addEventListener('click', clearInput);
 els.resetViewBtn.addEventListener('click', resetView);
+
+// Re-render view when label checkboxes are toggled (if view is already displayed)
+els.showLabelsCheckbox.addEventListener('change', () => {
+  if (viewer || jsmolApplet) {
+    view3D();
+  }
+});
+els.showIndexLabelsCheckbox.addEventListener('change', () => {
+  if (viewer || jsmolApplet) {
+    view3D();
+  }
+});
 
 // Auto-init example for convenience
 loadExample();
