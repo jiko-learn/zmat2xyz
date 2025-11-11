@@ -530,7 +530,10 @@ const els = {
   centerCheckbox: document.getElementById('centerCheckbox'),
   showLabelsCheckbox: document.getElementById('showLabelsCheckbox'),
   showIndexLabelsCheckbox: document.getElementById('showIndexLabelsCheckbox'),
-  mixedExampleBtn: document.getElementById('mixedExampleBtn')
+  mixedExampleBtn: document.getElementById('mixedExampleBtn'),
+  increaseHeightBtn: document.getElementById('increaseHeightBtn'),
+  decreaseHeightBtn: document.getElementById('decreaseHeightBtn'),
+  fullscreenBtn: document.getElementById('fullscreenBtn')
 };
 
 let viewer = null; // 3Dmol viewer (fallback)
@@ -596,7 +599,7 @@ function renderWithJSmol(xyz) {
   const data = xyz.endsWith('\n') ? xyz : xyz + '\n';
   
   let script = 'load DATA "model"\n' + data + 'END "model" {format xyz};\n' +
-               'select *; spacefill 25%; wireframe 0.15; set zoomLarge false; zoomTo 0.0;';
+               'select *; spacefill 30%; wireframe 0.2; color cpk; set specular on; set phong on; set shininess 128; set metalness 0.0; set ambient 0.1; set diffuse 0.9; set specular 1.0; set phongColor white; set phongExponent 64; set zoomLarge false; zoomTo 0.0;';
   
   // Add labels if checkboxes are checked
   if (els.showLabelsCheckbox.checked && els.showIndexLabelsCheckbox.checked) {
@@ -621,7 +624,47 @@ function renderWith3DMol(xyz) {
   }
   viewer.clear();
   viewer.addModel(xyz, 'xyz');
-  viewer.setStyle({}, { stick: { radius: 0.15 }, sphere: { scale: 0.28 } });
+  
+  // Set up CPK colors with Phong waxy shading - Ball and Stick Model
+  viewer.setStyle({}, { 
+    stick: { 
+      radius: 0.15, 
+      colorscheme: "cpk",
+      opacity: 1.0,
+      hidden: false,
+      // Phong shading properties
+      matcolor: 'white',
+      speccolor: 'white', 
+      shininess: 128,
+      metalness: 0.0
+    }, 
+    sphere: { 
+      scale: 0.3, 
+      colorscheme: "cpk",
+      opacity: 1.0,
+      hidden: false,
+      // Phong shading properties
+      matcolor: 'white',
+      speccolor: 'white',
+      shininess: 128,
+      metalness: 0.0
+    } 
+  });
+  
+  // Set viewer background for enhanced visual contrast
+  viewer.setBackgroundColor('white');
+  
+  // Apply Phong shading lighting
+  if (viewer.setLight) {
+    viewer.setLight({
+      direction: [0.5, 0.5, 1],
+      intensity: 1.0,
+      ambient: 0.1,
+      diffuse: 0.9,
+      specular: 1.0,
+      shininess: 128
+    });
+  }
   
   // Add labels if checkboxes are checked
   if (els.showLabelsCheckbox.checked || els.showIndexLabelsCheckbox.checked) {
@@ -652,7 +695,7 @@ function renderWith3DMol(xyz) {
         viewer.addLabel(labelText, {
           position: { x: x, y: y + 0.01, z: z }, // Offset y to place label above atom
           backgroundColor: 'rgba(0,0,0,0)',
-          fontColor: '#00ff00',
+          fontColor: 'rgba(81, 0, 255, 0.29)',
           backgroundOpacity: 0,
           fontSize: 15,
           fontFamily: 'Arial, sans-serif',
@@ -730,12 +773,72 @@ function clearInput() {
 
 function resetView() {
   if (jsmolApplet) {
-    Jmol.script(jsmolApplet, 'zoomTo 0.0;');
+    // Complete view reset for JSmol
+    Jmol.script(jsmolApplet, 'zoomTo 0.0; center; orient; reset; refresh;');
+    setMessage('View completely reset to default orientation', 'success');
     return;
   }
+  
   if (viewer) {
+    // Complete view reset for 3Dmol.js
     viewer.zoomTo();
+    
+    // Reset to default camera position
+    viewer.setCamera({ 
+      position: { x: 0, y: 0, z: 5 },
+      center: { x: 0, y: 0, z: 0 },
+      zoom: 1.0
+    });
+    
     viewer.render();
+    setMessage('View reset to default orientation and zoom', 'success');
+  }
+}
+
+// Viewer height adjustment functions
+const heightPresets = [400, 500, 600, 700, 800, 900, 1000];
+let currentHeightIndex = 2; // Start with 600px (index 2)
+
+function adjustViewerHeight(increase) {
+  if (increase && currentHeightIndex < heightPresets.length - 1) {
+    currentHeightIndex++;
+  } else if (!increase && currentHeightIndex > 0) {
+    currentHeightIndex--;
+  }
+  
+  const newHeight = heightPresets[currentHeightIndex];
+  els.viewerDiv.style.height = newHeight + 'px';
+  
+  // Re-render the viewer to fit new size
+  if (viewer) {
+    viewer.resize();
+    viewer.render();
+  }
+  
+  if (jsmolApplet) {
+    Jmol.script(jsmolApplet, 'refresh;');
+  }
+}
+
+function toggleFullscreen() {
+  const currentHeight = els.viewerDiv.style.height || '600px';
+  
+  if (els.viewerDiv.classList.contains('fullscreen')) {
+    els.viewerDiv.classList.remove('fullscreen');
+    els.viewerDiv.style.height = currentHeight;
+  } else {
+    els.viewerDiv.classList.add('fullscreen');
+    els.viewerDiv.style.height = '80vh';
+  }
+  
+  // Re-render the viewer to fit new size
+  if (viewer) {
+    viewer.resize();
+    viewer.render();
+  }
+  
+  if (jsmolApplet) {
+    Jmol.script(jsmolApplet, 'refresh;');
   }
 }
 
@@ -747,6 +850,11 @@ els.downloadXYZBtn.addEventListener('click', downloadXYZ);
 els.clearInputBtn.addEventListener('click', clearInput);
 els.resetViewBtn.addEventListener('click', resetView);
 els.mixedExampleBtn?.addEventListener('click', loadMixedFormatExample);
+
+// Viewer height adjustment listeners
+els.increaseHeightBtn.addEventListener('click', () => adjustViewerHeight(true));
+els.decreaseHeightBtn.addEventListener('click', () => adjustViewerHeight(false));
+els.fullscreenBtn.addEventListener('click', toggleFullscreen);
 
 // Handle mixed format details toggle
 const toggleButton = document.querySelector('.toggle-button');
