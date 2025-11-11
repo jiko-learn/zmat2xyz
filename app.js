@@ -3,6 +3,18 @@ function degToRad(deg) {
   return (deg * Math.PI) / 180;
 }
 
+// Extend 3Dmol.js color schemes for easy customization
+if (typeof $3Dmol !== 'undefined') {
+  // Custom color overrides for specific elements
+  $3Dmol.RasMolColors = {
+    ...$3Dmol.RasMolColors,
+    // Override specific elements with custom colors
+    Si: "#F0C8A0",   // Grayish gold (Silicon) - as requested
+    Al: "#E6B3B3",   // Pinky gold (Aluminum) - as requested
+    H: "#FF0000"     // Red hydrogen - as requested
+  };
+}
+
 // Vector math helpers
 function add(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
 function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
@@ -536,8 +548,7 @@ const els = {
   fullscreenBtn: document.getElementById('fullscreenBtn')
 };
 
-let viewer = null; // 3Dmol viewer (fallback)
-let jsmolApplet = null; // JSmol applet instance
+let viewer = null; // 3Dmol viewer
 
 function setMessage(text, type = '') {
   els.message.textContent = text;
@@ -569,54 +580,6 @@ function convertNow() {
   }
 }
 
-// ensureViewer removed in favor of generic renderXYZInElement
-
-function ensureJSmolApplet() {
-  if (!window.Jmol) return null;
-  if (jsmolApplet) return jsmolApplet;
-  const Info = {
-    width: els.viewerDiv.clientWidth || 600,
-    height: els.viewerDiv.clientHeight || 400,
-    use: 'HTML5',
-    debug: false,
-    color: '0x000000',
-    // Use hosted assets to avoid bundling j2s/php locally
-    j2sPath: 'https://chemapps.stolaf.edu/jmol/jsmol/j2s',
-    serverURL: 'https://chemapps.stolaf.edu/jmol/jsmol/php/jsmol.php',
-    disableJ2SLoadMonitor: true,
-    disableInitialConsole: true
-  };
-  jsmolApplet = Jmol.getApplet('jsmolApplet', Info);
-  // Inject the applet HTML into the viewer container
-  els.viewerDiv.innerHTML = Jmol.getAppletHtml(jsmolApplet);
-  return jsmolApplet;
-}
-
-function renderWithJSmol(xyz) {
-  const applet = ensureJSmolApplet();
-  if (!applet) return false;
-  // Ensure XYZ string ends with newline and is valid
-  const data = xyz.endsWith('\n') ? xyz : xyz + '\n';
-  
-  let script = 'load DATA "model"\n' + data + 'END "model" {format xyz};\n' +
-               'select *; spacefill 30%; wireframe 0.2; color cpk; set specular on; set phong on; set shininess 128; set metalness 0.0; set ambient 0.1; set diffuse 0.9; set specular 1.0; set phongColor white; set phongExponent 64; set zoomLarge false; zoomTo 0.0;';
-  
-  // Add labels if checkboxes are checked
-  if (els.showLabelsCheckbox.checked && els.showIndexLabelsCheckbox.checked) {
-    // Show both index and symbol (index first, no space)
-    script += 'select *; label "%i%e"; set labelOffset 0 0; set labelSize 16; set labelColor 0x00ff00; set labelBgColor transparent;';
-  } else if (els.showLabelsCheckbox.checked) {
-    script += 'select *; label %e; set labelOffset 0 0; set labelSize 16; set labelColor 0x00ff00; set labelBgColor transparent;';
-  } else if (els.showIndexLabelsCheckbox.checked) {
-    script += 'select *; label %i; set labelOffset 0 0; set labelSize 16; set labelColor 0x00ff00; set labelBgColor transparent;';
-  } else {
-    script += 'select *; label OFF;';
-  }
-  
-  Jmol.script(applet, script);
-  return true;
-}
-
 function renderWith3DMol(xyz) {
   if (!window.$3Dmol) return false;
   if (!viewer) {
@@ -625,30 +588,30 @@ function renderWith3DMol(xyz) {
   viewer.clear();
   viewer.addModel(xyz, 'xyz');
   
-  // Set up CPK colors with Phong waxy shading - Ball and Stick Model
+  // Set up basic ball-and-stick model
   viewer.setStyle({}, { 
-    stick: { 
-      radius: 0.15, 
-      colorscheme: "cpk",
-      opacity: 1.0,
-      hidden: false,
-      // Phong shading properties
-      matcolor: 'white',
-      speccolor: 'white', 
-      shininess: 128,
-      metalness: 0.0
-    }, 
     sphere: { 
-      scale: 0.3, 
-      colorscheme: "cpk",
-      opacity: 1.0,
-      hidden: false,
-      // Phong shading properties
-      matcolor: 'white',
-      speccolor: 'white',
-      shininess: 128,
-      metalness: 0.0
+      scale: 0.25
+    },
+    stick: { 
+      radius: 0.18
     } 
+  });
+  
+  // Apply custom styling with RGBA colors for enhanced transparency effects
+  viewer.setStyle({elem: "H"}, {
+    sphere: { scale: 0.23, color: "rgba(237, 251, 251, 0.76)" }, // Semi-transparent hydrogen
+    stick: { radius: 0.18, color: "rgba(237, 251, 251, 0.76)"  } // Semi-transparent bonds
+  });
+  
+  viewer.setStyle({elem: "Si"}, {
+    sphere: { scale: 0.25, color: "rgba(99, 99, 99, 0.9)" }, // Semi-transparent gray silicon
+    stick: { radius: 0.18, color: "rgba(99, 99, 99, 0.9)"  }  // Semi-transparent gray bonds
+  });
+  
+  viewer.setStyle({elem: "Al"}, {
+    sphere: { scale: 0.25, color: "rgba(230, 179, 179, 0.8)" }, // Semi-transparent pink gold aluminum
+    stick: { radius: 0.18, color: "rgba(230, 179, 179, 0.7)" }  // Semi-transparent pink gold bonds
   });
   
   // Set viewer background for enhanced visual contrast
@@ -722,9 +685,9 @@ function view3D() {
   }
   try {
     const xyz = els.xyzOutput.value;
-    // Prefer JSmol when available
-    const ok = renderWithJSmol(xyz) || renderWith3DMol(xyz);
-    if (!ok) throw new Error('No supported 3D viewer found (JSmol or 3Dmol).');
+    // Use only 3Dmol.js
+    const ok = renderWith3DMol(xyz);
+    if (!ok) throw new Error('3Dmol.js viewer not found.');
     setMessage('3D view ready.', 'success');
   } catch (e) {
     console.error(e);
@@ -772,26 +735,14 @@ function clearInput() {
 }
 
 function resetView() {
-  if (jsmolApplet) {
-    // Complete view reset for JSmol
-    Jmol.script(jsmolApplet, 'zoomTo 0.0; center; orient; reset; refresh;');
-    setMessage('View completely reset to default orientation', 'success');
-    return;
-  }
-  
+  // Clear the viewer completely and reload
   if (viewer) {
-    // Complete view reset for 3Dmol.js
-    viewer.zoomTo();
-    
-    // Reset to default camera position
-    viewer.setCamera({ 
-      position: { x: 0, y: 0, z: 5 },
-      center: { x: 0, y: 0, z: 0 },
-      zoom: 1.0
-    });
-    
-    viewer.render();
-    setMessage('View reset to default orientation and zoom', 'success');
+    // Destroy and recreate 3Dmol viewer
+    viewer = null;
+    els.viewerDiv.innerHTML = '';
+    // Re-render with current data
+    view3D();
+    setMessage('Viewer reloaded', 'success');
   }
 }
 
@@ -810,14 +761,10 @@ function adjustViewerHeight(increase) {
   els.viewerDiv.style.height = newHeight + 'px';
   
   // Re-render the viewer to fit new size
-  if (viewer) {
-    viewer.resize();
-    viewer.render();
-  }
-  
-  if (jsmolApplet) {
-    Jmol.script(jsmolApplet, 'refresh;');
-  }
+if (viewer) {
+  viewer.resize();
+  viewer.render();
+}
 }
 
 function toggleFullscreen() {
@@ -832,14 +779,10 @@ function toggleFullscreen() {
   }
   
   // Re-render the viewer to fit new size
-  if (viewer) {
-    viewer.resize();
-    viewer.render();
-  }
-  
-  if (jsmolApplet) {
-    Jmol.script(jsmolApplet, 'refresh;');
-  }
+if (viewer) {
+  viewer.resize();
+  viewer.render();
+}
 }
 
 // Event listeners
@@ -876,12 +819,12 @@ if (toggleButton && toggleContent) {
 
 // Re-render view when label checkboxes are toggled (if view is already displayed)
 els.showLabelsCheckbox.addEventListener('change', () => {
-  if (viewer || jsmolApplet) {
+  if (viewer) {
     view3D();
   }
 });
 els.showIndexLabelsCheckbox.addEventListener('change', () => {
-  if (viewer || jsmolApplet) {
+  if (viewer) {
     view3D();
   }
 });
