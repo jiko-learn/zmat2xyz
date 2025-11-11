@@ -3,36 +3,51 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Z-Matrix → XYZ Converter & Viewer</title>
+    <title>Smart Molecule Converter</title>
     <link rel="stylesheet" href="./styles.css">
     <!-- Local 3Dmol.js -->
     <script src="./vendor/3Dmol-min.js"></script>
     </head>
   <body>
     <header>
-      <h1>Z-Matrix → XYZ Converter & 3D Viewer</h1>
-      <h2>ให้ลองใช้งาน แล้วทดสอบโดยเปลี่ยนเป็น H<sub>2</sub>O<sub>2</sub>, CH<sub>4</sub>, H<sub>2</sub>O<sup>...</sup>H<sub>2</sub>O <br>
-      วันพุธจะได้เรียนได้เร็วขึ้นครับ</h2>
+      <h1>Smart Molecule Converter</h1>
+      <!-- <h2>ให้ลองใช้งาน แล้วทดสอบโดยเปลี่ยนเป็น H<sub>2</sub>O<sub>2</sub>, CH<sub>4</sub>, H<sub>2</sub>O<sup>...</sup>H<sub>2</sub>O <br>
+      วันพุธจะได้เรียนได้เร็วขึ้นครับ</h2> -->
     </header>
 
     <main>
       <section class="panel">
         <div class="panel-header">
-          <h2>Z-Matrix Input</h2>
+          <h2>Mixed Format Molecule Input</h2>
           <div class="actions">
-            <button id="loadExampleBtn" type="button">Load Example</button>
+            <button id="mixedExampleBtn" type="button" class="primary">Load Example</button>
             <button id="clearInputBtn" type="button" class="secondary">Clear</button>
           </div>
         </div>
-        <p class="hint">Format (indices are 1-based):<br>
-          1)  &nbsp;&nbsp;Atom1<br>
-          2)  &nbsp;&nbsp;Atom2&nbsp; i&nbsp; R1<br>
-          3)  &nbsp;&nbsp;Atom3&nbsp; j&nbsp; R2&nbsp;&nbsp;k&nbsp;&nbsp;A1<br>
-          4+) Atom?&nbsp; l&nbsp; R3&nbsp; m&nbsp; A2&nbsp; n&nbsp; D1<br><br>
-          Angles in degrees. Dihedrals in degrees. <br>
-          i j k l are the indices of the atoms in the previous lines. <br>
+        <div class="hint">
+          <button class="toggle-button" aria-expanded="false" aria-controls="mixed-format-details">
+            <strong>Mixed Format Usage:</strong> <span class="toggle-text">(Click to see details)</span>
+            <span class="toggle-icon">+</span>
+          </button>
+          <div class="toggle-content" id="mixed-format-details" hidden>
+            <p><strong>Mixed Format Details:</strong></p>
+            <p>You can use mix format by define some atoms with exact positions (Cartesian/XYZ), then use Z-Matrix to add more atoms that reference previously defined atoms.</p>
+            <p><strong>Example - Formaldehyde:</strong></p>
+            <p>&nbsp;&nbsp;<em>First define atoms in Cartesian coordinates:</em></p>
+            <p>&nbsp;&nbsp;C 0.000 0.000 0.000</p>
+            <p>&nbsp;&nbsp;O 1.200 0.000 0.000</p>
+            <p>&nbsp;&nbsp;<em>Then add hydrogens using Z-Matrix references:</em></p>
+            <p>&nbsp;&nbsp;H 1 1.100 2 120.0</p>
+            <p>&nbsp;&nbsp;H 1 1.100 2 120.0 3 180.0</p>
+          </div>
+        </div>
+        <p class="hint"><strong>Z-Matrix Format Rules:</strong><br>
+          &nbsp;&nbsp;• 2nd atom: Element j R (bond distance)<br>
+          &nbsp;&nbsp;• 3rd atom: Element j R k A (bond + angle)<br>
+          &nbsp;&nbsp;• 4th+ atoms: Element j R k A l D (full specification)<br><br>
+          Angles, Dihedrals in degrees and Reference indices (j,k,l) refer to atoms in previous lines. <br>
         </p>
-        <textarea id="zmatInput" placeholder="Enter your Z-Matrix here..." spellcheck="false"></textarea>
+        <textarea id="zmatInput" placeholder="Enter your mixed format molecule here..." spellcheck="false"></textarea>
         <div class="row gap">
           <button id="convertBtn" type="button">Convert to XYZ</button>
           <label><input type="checkbox" id="centerCheckbox"> Center the molecule</label>

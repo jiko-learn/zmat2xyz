@@ -162,6 +162,342 @@ function zmatToXYZ(parsed) {
   }));
 }
 
+// Parse Cartesian coordinates (Element x.xxx y.yyy z.zzzz format)
+function parseCartesian(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
+  if (lines.length === 0) throw new Error('Empty input.');
+
+  // Check if first line is atom count (XYZ format)
+  const firstLine = lines[0].trim();
+  let startIndex = 0;
+  
+  if (/^\d+$/.test(firstLine) && lines.length >= 3) {
+    // Standard XYZ format with atom count and comment
+    startIndex = 2; // Skip atom count and comment line
+  }
+
+  const atoms = [];
+  for (let i = startIndex; i < lines.length; i++) {
+    const tokens = lines[i].split(/\s+/);
+    if (tokens.length < 4) throw new Error(`Line ${i+1}: expected 4 tokens (Element x y z), got ${tokens.length}`);
+    
+    const element = tokens[0];
+    const x = parseFloat(tokens[1]);
+    const y = parseFloat(tokens[2]);
+    const z = parseFloat(tokens[3]);
+    
+    if (isNaN(x) || isNaN(y) || isNaN(z)) {
+      throw new Error(`Line ${i+1}: invalid coordinate values`);
+    }
+    
+    atoms.push({ element, x, y, z });
+  }
+  
+  return atoms;
+}
+
+/**
+ * Enhanced format detection for mixed input support
+ * Detects if input contains mixed formats (XYZ/Cartesian + Z-Matrix)
+ */
+function detectInputFormat(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
+  if (lines.length === 0) throw new Error('Empty input.');
+
+  // Check for standard XYZ format (atom count + comment + coordinates)
+  const firstLine = lines[0].trim();
+  if (/^\d+$/.test(firstLine) && lines.length >= 3) {
+    return 'xyz';
+  }
+
+  // Analyze all lines to detect format patterns
+  let hasCartesian = false;
+  let hasZMatrix = false;
+  let hasMixedFormat = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const tokens = line.split(/\s+/);
+    
+    if (tokens.length === 4) {
+      // Potential Cartesian coordinate (Element x y z)
+      const x = parseFloat(tokens[1]);
+      const y = parseFloat(tokens[2]);
+      const z = parseFloat(tokens[3]);
+      if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
+        hasCartesian = true;
+        continue;
+      }
+    }
+    
+    // Check for Z-matrix pattern (Element followed by numbers with references)
+    if (tokens.length >= 3) {
+      // Look for integer indices that could be Z-Matrix references
+      for (let j = 1; j < tokens.length; j++) {
+        if (/^\d+$/.test(tokens[j])) {
+          hasZMatrix = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // Detect mixed format
+  hasMixedFormat = hasCartesian && hasZMatrix;
+  
+  if (hasMixedFormat) {
+    return 'mixed';
+  } else if (hasZMatrix) {
+    return 'zmat';
+  } else if (hasCartesian) {
+    return 'cartesian';
+  } else {
+    // Default to Z-matrix for backward compatibility
+    return 'zmat';
+  }
+}
+
+/**
+ * Parse mixed format input (XYZ/Cartesian + Z-Matrix in same input)
+ * @param {string} text - Input text containing mixed format
+ * @returns {Array} Array of atom objects with element, x, y, z coordinates
+ */
+function parseMixedFormat(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('#'));
+  if (lines.length === 0) throw new Error('Empty input.');
+  
+  let startIndex = 0;
+  let atomCount = null;
+  
+  // Check if first line is atom count (XYZ format)
+  if (/^\d+$/.test(lines[0].trim()) && lines.length >= 3) {
+    atomCount = parseInt(lines[0].trim());
+    startIndex = 2; // Skip atom count and comment
+  }
+  
+  const atoms = [];
+  const zMatrixEntries = []; // Store Z-Matrix entries for later processing
+  
+  // First pass: parse all lines and separate Cartesian from Z-Matrix
+  for (let i = startIndex; i < lines.length; i++) {
+    const tokens = lines[i].split(/\s+/);
+    
+    if (tokens.length === 4) {
+      // Check if this looks like Cartesian coordinates
+      const x = parseFloat(tokens[1]);
+      const y = parseFloat(tokens[2]);
+      const z = parseFloat(tokens[3]);
+      if (!isNaN(x) && !isNaN(y) && !isNaN(z)) {
+        // This is a Cartesian coordinate
+        atoms.push({
+          element: tokens[0],
+          x: x,
+          y: y,
+          z: z,
+          format: 'cartesian'
+        });
+        continue;
+      }
+    }
+    
+    // If we get here, it's likely a Z-Matrix entry
+    // For mixed format, we treat Z-Matrix entries as they are
+    const zmatEntry = { element: tokens[0] };
+    
+    if (tokens.length >= 3) {
+      const j = parseInt(tokens[1], 10);
+      const r = parseFloat(tokens[2]);
+      if (isNaN(j) || isNaN(r)) {
+        throw new Error(`Invalid bond reference or distance on line ${i + 1}: "${tokens.join(' ')}"`);
+      }
+      zmatEntry.j = j - 1;
+      zmatEntry.r = r;
+    }
+    if (tokens.length >= 5) {
+      const k = parseInt(tokens[3], 10);
+      const angle = parseFloat(tokens[4]);
+      if (isNaN(k) || isNaN(angle)) {
+        throw new Error(`Invalid angle reference or angle on line ${i + 1}: "${tokens.join(' ')}"`);
+      }
+      zmatEntry.k = k - 1;
+      zmatEntry.theta = degToRad(angle);
+    }
+    if (tokens.length >= 7) {
+      const l = parseInt(tokens[5], 10);
+      const dihedral = parseFloat(tokens[6]);
+      if (isNaN(l) || isNaN(dihedral)) {
+        throw new Error(`Invalid dihedral reference or dihedral on line ${i + 1}: "${tokens.join(' ')}"`);
+      }
+      zmatEntry.l = l - 1;
+      zmatEntry.phi = degToRad(dihedral);
+    }
+    
+    zMatrixEntries.push(zmatEntry);
+  }
+  
+  // Process Z-Matrix entries using already defined atoms as references
+  for (let i = 0; i < zMatrixEntries.length; i++) {
+    const zmatEntry = zMatrixEntries[i];
+    const atom = processZMatrixEntry(zmatEntry, atoms);
+    atom.format = 'zmat';
+    atoms.push(atom);
+  }
+  
+  return atoms;
+}
+
+/**
+ * Process a Z-Matrix entry to get Cartesian coordinates
+ * @param {Object} zmatEntry - Z-Matrix entry
+ * @param {Array} existingAtoms - Array of already defined atoms
+ * @returns {Object} Atom with Cartesian coordinates
+ */
+function processZMatrixEntry(zmatEntry, existingAtoms) {
+  if (!existingAtoms || existingAtoms.length === 0) {
+    throw new Error('No existing atoms found for Z-Matrix reference');
+  }
+  
+  // For mixed format, we need at least bond distance and reference
+  if (zmatEntry.j === undefined) {
+    throw new Error('Z-Matrix entry missing bond reference (j)');
+  }
+  
+  // Validate bond reference
+  if (zmatEntry.j < 0 || zmatEntry.j >= existingAtoms.length) {
+    throw new Error(`Invalid bond reference: ${zmatEntry.j + 1}. Must be 1-${existingAtoms.length}`);
+  }
+  
+  // Get the position from the existing atom we're referencing
+  const j = zmatEntry.j;
+  const r = zmatEntry.r;
+  
+  // Check that the referenced atom exists and has coordinates
+  if (!existingAtoms[j] || typeof existingAtoms[j].x === 'undefined') {
+    throw new Error(`Referenced atom ${j + 1} does not exist or has no coordinates`);
+  }
+  
+  const pj = [existingAtoms[j].x, existingAtoms[j].y, existingAtoms[j].z];
+  
+  if (existingAtoms.length === 1) {
+    // Second atom in the structure - place at distance along x-axis
+    const position = [pj[0] + r, pj[1], pj[2]];
+    return {
+      element: zmatEntry.element,
+      x: position[0],
+      y: position[1],
+      z: position[2]
+    };
+  }
+  
+  // For third or later atoms
+  if (zmatEntry.k === undefined) {
+    throw new Error('Z-Matrix entry missing angle reference (k)');
+  }
+  
+  if (zmatEntry.k < 0 || zmatEntry.k >= existingAtoms.length) {
+    throw new Error(`Invalid angle reference: ${zmatEntry.k + 1}. Must be 1-${existingAtoms.length}`);
+  }
+  
+  // Check that the angle reference atom exists and has coordinates
+  if (!existingAtoms[zmatEntry.k] || typeof existingAtoms[zmatEntry.k].x === 'undefined') {
+    throw new Error(`Referenced atom ${zmatEntry.k + 1} does not exist or has no coordinates`);
+  }
+  
+  const k = zmatEntry.k;
+  const theta = zmatEntry.theta;
+  
+  if (existingAtoms.length === 2) {
+    // Third atom - use angle and distance
+    const pk = [existingAtoms[k].x, existingAtoms[k].y, existingAtoms[k].z];
+    
+    // u: direction j -> k
+    const u = normalize(sub(pk, pj));
+    
+    // Choose perpendicular e2
+    let arbitrary = [0, 0, 1];
+    if (nearlyColinear(u, arbitrary)) arbitrary = [0, 1, 0];
+    const e2 = normalize(cross(u, arbitrary));
+    
+    // position: pj + r * ( cos(theta) * u + sin(theta) * e2 )
+    const dir = add(scale(u, Math.cos(theta)), scale(e2, Math.sin(theta)));
+    const position = add(pj, scale(dir, r));
+    
+    return {
+      element: zmatEntry.element,
+      x: position[0],
+      y: position[1],
+      z: position[2]
+    };
+  }
+  
+  // Fourth or later atom - use full Z-Matrix specification
+  if (zmatEntry.l === undefined) {
+    throw new Error('Z-Matrix entry missing dihedral reference (l)');
+  }
+  
+  if (zmatEntry.l < 0 || zmatEntry.l >= existingAtoms.length) {
+    throw new Error(`Invalid dihedral reference: ${zmatEntry.l + 1}. Must be 1-${existingAtoms.length}`);
+  }
+  
+  // Check that the dihedral reference atom exists and has coordinates
+  if (!existingAtoms[zmatEntry.l] || typeof existingAtoms[zmatEntry.l].x === 'undefined') {
+    throw new Error(`Referenced atom ${zmatEntry.l + 1} does not exist or has no coordinates`);
+  }
+  
+  const l = zmatEntry.l;
+  const phi = zmatEntry.phi;
+  
+  const pk = [existingAtoms[k].x, existingAtoms[k].y, existingAtoms[k].z];
+  const pl = [existingAtoms[l].x, existingAtoms[l].y, existingAtoms[l].z];
+  
+  // Build local orthonormal frame
+  const u = normalize(sub(pk, pj));
+  let a = sub(pl, pj);
+  a = normalize(a);
+  let v = cross(u, a);
+  v = normalize(v);
+  
+  // Handle degeneracy
+  if (norm(v) === 0 || Number.isNaN(v[0])) {
+    let arbitrary = [0, 0, 1];
+    if (nearlyColinear(u, arbitrary)) arbitrary = [0, 1, 0];
+    v = normalize(cross(u, arbitrary));
+  }
+  const w = cross(v, u);
+  
+  // position: pj + r * ( cos(theta) * u + sin(theta) * ( cos(phi) * w + sin(phi) * v ) )
+  const dir = add(
+    scale(u, Math.cos(theta)),
+    scale(add(scale(w, Math.cos(phi)), scale(v, Math.sin(phi))), Math.sin(theta))
+  );
+  const position = add(pj, scale(dir, r));
+  
+  return {
+    element: zmatEntry.element,
+    x: position[0],
+    y: position[1],
+    z: position[2]
+  };
+}
+
+// Main conversion function that handles mixed input
+function convertMixedInput(text) {
+  const format = detectInputFormat(text);
+  
+  switch (format) {
+    case 'mixed':
+      return parseMixedFormat(text);
+    case 'xyz':
+    case 'cartesian':
+      return parseCartesian(text);
+    case 'zmat':
+      const parsed = parseZMatrix(text);
+      return zmatToXYZ(parsed);
+    default:
+      throw new Error('Unknown input format');
+  }
+}
+
 function formatXYZ(atoms, comment = 'Converted from Z-Matrix') {
   const lines = [];
   lines.push(String(atoms.length));
@@ -188,13 +524,13 @@ const els = {
   xyzOutput: document.getElementById('xyzOutput'),
   copyXYZBtn: document.getElementById('copyXYZBtn'),
   downloadXYZBtn: document.getElementById('downloadXYZBtn'),
-  loadExampleBtn: document.getElementById('loadExampleBtn'),
   clearInputBtn: document.getElementById('clearInputBtn'),
   viewerDiv: document.getElementById('viewer'),
   resetViewBtn: document.getElementById('resetViewBtn'),
   centerCheckbox: document.getElementById('centerCheckbox'),
   showLabelsCheckbox: document.getElementById('showLabelsCheckbox'),
-  showIndexLabelsCheckbox: document.getElementById('showIndexLabelsCheckbox')
+  showIndexLabelsCheckbox: document.getElementById('showIndexLabelsCheckbox'),
+  mixedExampleBtn: document.getElementById('mixedExampleBtn')
 };
 
 let viewer = null; // 3Dmol viewer (fallback)
@@ -208,11 +544,22 @@ function setMessage(text, type = '') {
 function convertNow() {
   try {
     setMessage('Converting...', '');
-    const parsed = parseZMatrix(els.zmatInput.value);
-    let atoms = zmatToXYZ(parsed);
+    const input = els.zmatInput.value;
+    const format = detectInputFormat(input);
+    let atoms = convertMixedInput(input);
     if (els.centerCheckbox.checked) atoms = centerAtoms(atoms);
     els.xyzOutput.value = formatXYZ(atoms);
-    setMessage('Conversion successful.', 'success');
+    
+    let formatName = '';
+    switch(format) {
+      case 'mixed': formatName = 'Mixed format (XYZ/Cartesian + Z-Matrix)'; break;
+      case 'xyz': formatName = 'XYZ (with atom count)'; break;
+      case 'cartesian': formatName = 'Cartesian coordinates'; break;
+      case 'zmat': formatName = 'Z-Matrix'; break;
+      default: formatName = 'Unknown'; break;
+    }
+    
+    setMessage(`Conversion successful. Detected format: ${formatName}`, 'success');
   } catch (err) {
     console.error(err);
     setMessage(err.message || 'Conversion failed.', 'error');
@@ -362,16 +709,18 @@ function downloadXYZ() {
   URL.revokeObjectURL(url);
 }
 
-function loadExample() {
-  // Ammonia example: trigonal pyramid around nitrogen
+function loadMixedFormatExample() {
+  // Mixed format example: simple formaldehyde
+  // Define atoms in Cartesian, then add substituents using Z-Matrix
   const example = [
-    'N',
-    'H 1 1.0100',
-    'H 1 1.0100 2 107.80',
-    'H 1 1.0100 2 107.80 3 120.00'
+    'C 0.000 0.000 0.000',
+    'O 1.200 0.000 0.000',
+    // Add hydrogens using Z-Matrix references
+    'H 1 1.100 2 120.0',
+    'H 1 1.100 2 120.0 3 180.0'
   ].join('\n');
   els.zmatInput.value = example;
-  setMessage('Loaded example (NH3).', '');
+  setMessage('Loaded mixed format example (Formaldehyde).', '');
 }
 
 function clearInput() {
@@ -395,9 +744,27 @@ els.convertBtn.addEventListener('click', convertNow);
 els.view3DBtn.addEventListener('click', view3D);
 els.copyXYZBtn.addEventListener('click', copyXYZ);
 els.downloadXYZBtn.addEventListener('click', downloadXYZ);
-els.loadExampleBtn.addEventListener('click', loadExample);
 els.clearInputBtn.addEventListener('click', clearInput);
 els.resetViewBtn.addEventListener('click', resetView);
+els.mixedExampleBtn?.addEventListener('click', loadMixedFormatExample);
+
+// Handle mixed format details toggle
+const toggleButton = document.querySelector('.toggle-button');
+const toggleContent = document.querySelector('.toggle-content');
+
+if (toggleButton && toggleContent) {
+  toggleButton.addEventListener('click', () => {
+    const isExpanded = toggleButton.getAttribute('aria-expanded') === 'true';
+    
+    if (isExpanded) {
+      toggleButton.setAttribute('aria-expanded', 'false');
+      toggleContent.setAttribute('hidden', '');
+    } else {
+      toggleButton.setAttribute('aria-expanded', 'true');
+      toggleContent.removeAttribute('hidden');
+    }
+  });
+}
 
 // Re-render view when label checkboxes are toggled (if view is already displayed)
 els.showLabelsCheckbox.addEventListener('change', () => {
@@ -412,7 +779,7 @@ els.showIndexLabelsCheckbox.addEventListener('change', () => {
 });
 
 // Auto-init example for convenience
-loadExample();
+loadMixedFormatExample();
 
 
 
