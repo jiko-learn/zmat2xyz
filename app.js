@@ -601,11 +601,11 @@ function renderWithJSmol(xyz) {
   // Add labels if checkboxes are checked
   if (els.showLabelsCheckbox.checked && els.showIndexLabelsCheckbox.checked) {
     // Show both index and symbol (index first, no space)
-    script += 'select *; label "%i%e"; set labelOffset 0 0; set labelSize 16; set labelColor black; set labelBgColor white;';
+    script += 'select *; label "%i%e"; set labelOffset 0 0; set labelSize 16; set labelColor 0x00ff00; set labelBgColor transparent;';
   } else if (els.showLabelsCheckbox.checked) {
-    script += 'select *; label %e; set labelOffset 0 0; set labelSize 16; set labelColor black; set labelBgColor white;';
+    script += 'select *; label %e; set labelOffset 0 0; set labelSize 16; set labelColor 0x00ff00; set labelBgColor transparent;';
   } else if (els.showIndexLabelsCheckbox.checked) {
-    script += 'select *; label %i; set labelOffset 0 0; set labelSize 16; set labelColor black; set labelBgColor white;';
+    script += 'select *; label %i; set labelOffset 0 0; set labelSize 16; set labelColor 0x00ff00; set labelBgColor transparent;';
   } else {
     script += 'select *; label OFF;';
   }
@@ -651,15 +651,15 @@ function renderWith3DMol(xyz) {
         // Add label positioned slightly above the atom
         viewer.addLabel(labelText, {
           position: { x: x, y: y + 0.3, z: z }, // Offset y to place label above atom
-          backgroundColor: 'rgba(255,255,255,0.9)',
-          fontColor: 'black',
-          backgroundOpacity: 0.9,
-          fontSize: 14,
+          backgroundColor: 'rgba(0,0,0,0)',
+          fontColor: '#00ff00',
+          backgroundOpacity: 0,
+          fontSize: 16,
           fontFamily: 'Arial, sans-serif',
           alignment: 'center',
-          showBackground: true,
+          showBackground: false,
           inFront: true,
-          backgroundPadding: 1
+          backgroundPadding: 0
         });
       }
     }
