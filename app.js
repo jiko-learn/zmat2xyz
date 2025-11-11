@@ -650,11 +650,11 @@ function renderWith3DMol(xyz) {
         
         // Add label positioned slightly above the atom
         viewer.addLabel(labelText, {
-          position: { x: x, y: y + 0.3, z: z }, // Offset y to place label above atom
+          position: { x: x, y: y + 0.01, z: z }, // Offset y to place label above atom
           backgroundColor: 'rgba(0,0,0,0)',
           fontColor: '#00ff00',
           backgroundOpacity: 0,
-          fontSize: 16,
+          fontSize: 15,
           fontFamily: 'Arial, sans-serif',
           alignment: 'center',
           showBackground: false,
